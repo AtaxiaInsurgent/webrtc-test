@@ -92,9 +92,7 @@ socket.on('log', function(array) {
 
 function sendMessage(message) {
   console.log('Client sending message: ', message);
-  var alertMessage = 'Client sending message: ' + message;
   socket.emit('message', message);
-  alert(alertMessage);
 }
 
 // This client receives a message
