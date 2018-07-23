@@ -200,7 +200,6 @@ function handleIceCandidate(event) {
       type: 'candidate',
       label: event.candidate.sdpMLineIndex,
       id: event.candidate.sdpMid,
-      description: event.candidate.sessionDescription,
       candidate: event.candidate.candidate
     });
   } else {
