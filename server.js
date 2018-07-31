@@ -8,7 +8,7 @@ var socketIO = require('socket.io');
 var fileServer = new(nodeStatic.Server)();
 var app = http.createServer(function(req, res) {
   fileServer.serve(req, res);
-}).listen(8080);
+}).listen(process.env.PORT || 8080);
 
 var io = socketIO.listen(app);
 io.sockets.on('connection', function(socket) {
@@ -20,10 +20,11 @@ io.sockets.on('connection', function(socket) {
     socket.emit('log', array);
   }
 
-  socket.on('message', function(message) {
-    console.log('Client said: ', message);
+  socket.on('message', function(room, message) {
+    console.log('\[Room ' + room + '\] Client said: ', message);
     // for a real app, would be room-only (not broadcast)
-    socket.broadcast.emit('message', message);
+    // socket.broadcast.emit('message', message);
+    socket.to(room).emit('message', message)
   });
 
   socket.on('create or join', function(room) {
@@ -60,8 +61,39 @@ io.sockets.on('connection', function(socket) {
     }
   });
 
-  socket.on('bye', function(){
+  socket.on('bye', function(room){
     console.log('received bye');
+    console.log('room ', room);
+    var clientsInRoom = io.sockets.adapter.rooms[room];
+    var numClients = clientsInRoom ? Object.keys(clientsInRoom.sockets).length : 0;
+    console.log('Client count(BEFORE): ', numClients)
+    console.log('Client ID ' + socket.id + ' left room ' + room);
+    
+    // var roomSockets = [];
+    // io.sockets.adapter.clients([room], (err, clients) => {
+    //   console.log(clients);
+    //   roomSockets = clients;
+    // });
+    // roomSockets.forEach(function(socketId) {
+    //   io.sockets.adapter.remoteLeave(socketId, false, function(err) {
+    //     console.log('err', err);
+    //   });
+    // });
+
+    io.sockets.in(room).clients((err, socketIds) => {
+      if (err) throw err;
+
+      socketIds.forEach((socketId) => { 
+        console.log('socketId ', socketId);
+        io.sockets.sockets[socketId].emit('destroyed', room)
+        io.sockets.sockets[socketId].leave(room); 
+      });
+
+      numClients = clientsInRoom ? Object.keys(clientsInRoom.sockets).length : 0;
+      console.log('Client count(AFTER): ', numClients)
+    });
+
+    // socket.leave(room);
   });
 
 });

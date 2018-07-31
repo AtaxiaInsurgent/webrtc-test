@@ -55,32 +55,56 @@ var sdpConstraints = {
 
 var room = 'shaqfoo';
 // Could prompt for room name:
-room = prompt('Enter room name:');
+// room = prompt('Enter room name:');
+
+// if (room == null) {
+//   room = 'shaqfoo';
+//   console.log('room', room);
+// }
 
 var socket = io.connect();
 
-if (room !== '') {
-  socket.emit('create or join', room);
-  console.log('Attempted to create or  join room', room);
+// if (room !== '') {
+//   socket.emit('create or join', room);
+//   console.log('Attempted to create or  join room', room);
+// }
+
+function createJoinRoom() {
+  var textInput = document.getElementById('roomInput').value;
+  
+  if (textInput !== '' || textInput != null) {
+    room = textInput;
+    socket.emit('create or join', room);
+    console.log('Attempted to create or  join room', room);
+  }
 }
 
 socket.on('created', function(room) {
   console.log('Created room ' + room);
+  document.getElementById("submitButton").disabled = true
+  document.getElementById("hangupButton").disabled = false
   isInitiator = true;
 });
 
 socket.on('full', function(room) {
   console.log('Room ' + room + ' is full');
+  alert('Room ' + room + ' is full');
 });
 
 socket.on('join', function (room){
   console.log('Another peer made a request to join room ' + room);
   console.log('This peer is the initiator of room ' + room + '!');
+  document.getElementById("submitButton").disabled = true
+  document.getElementById("hangupButton").disabled = false
+  getUserMedia();
   isChannelReady = true;
 });
 
 socket.on('joined', function(room) {
   console.log('joined: ' + room);
+  document.getElementById("submitButton").disabled = true
+  document.getElementById("hangupButton").disabled = false
+  getUserMedia();
   isChannelReady = true;
 });
 
@@ -88,11 +112,21 @@ socket.on('log', function(array) {
   console.log.apply(console, array);
 });
 
+socket.on('destroyed', function(room) {
+  console.log('Room ' + room + ' destroyed');
+  document.getElementById("submitButton").disabled = false
+  document.getElementById("hangupButton").disabled = true
+  isChannelReady = false;
+  isInitiator = false;
+});
+
 ////////////////////////////////////////////////
 
 function sendMessage(message) {
   console.log('Client sending message: ', message);
-  socket.emit('message', message);
+  if (room !== '' || room != null) {
+    socket.emit('message', room, message);
+  }
 }
 
 // This client receives a message
@@ -126,14 +160,25 @@ var remoteVideo = document.querySelector('#remoteVideo');
 var localAudio = document.querySelector('#localAudio');
 var remoteAudio = document.querySelector('#remoteAudio');
 
-navigator.mediaDevices.getUserMedia({
-  audio: true,
-  video: false
-})
-.then(gotStream)
-.catch(function(e) {
-  alert('getUserMedia() error: ' + e.name);
-});
+// navigator.mediaDevices.getUserMedia({
+//   audio: true,
+//   video: false
+// })
+// .then(gotStream)
+// .catch(function(e) {
+//   alert('getUserMedia() error: ' + e.name);
+// });
+
+function getUserMedia() {
+  navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: false
+  })
+  .then(gotStream)
+  .catch(function(e) {
+    alert('getUserMedia() error: ' + e.name);
+  });
+}
 
 function gotStream(stream) {
   console.log('Adding local stream.');
@@ -173,6 +218,8 @@ function maybeStart() {
 }
 
 window.onbeforeunload = function() {
+  console.log('window.onbeforeunload');
+  socket.emit('bye', room);
   sendMessage('bye');
 };
 
@@ -282,6 +329,7 @@ function handleRemoteStreamRemoved(event) {
 function hangup() {
   console.log('Hanging up.');
   stop();
+  socket.emit('bye', room);
   sendMessage('bye');
 }
 

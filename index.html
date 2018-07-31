@@ -18,6 +18,14 @@
     <video id="remoteVideo" autoplay></video>
   </div> -->
 
+  <form>
+    <input type="text" id="roomInput" value="shaqfoo">
+    <br><br>
+    <input type="button" id="submitButton" onclick="createJoinRoom()" value="Submit">
+    <input type="button" id="hangupButton" onclick="hangup()" value="Hangup" disabled>
+    <br><br>
+  </form> 
+
   <div id="audio">
     <audio id="localAudio" controls></audio>
     <audio id="remoteAudio" controls autoplay></audio>
