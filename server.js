@@ -20,10 +20,17 @@ io.sockets.on('connection', function(socket) {
     socket.emit('log', array);
   }
 
-  socket.on('message', function(room, message) {
+  // socket.on('message', function(room, message) {
+  //   console.log('\[Room ' + room + '\] Client said: ', message);
+  //   // for a real app, would be room-only (not broadcast)
+  //   // socket.broadcast.emit('message', message);
+  //   socket.to(room).emit('message', message)
+  // });
+
+  socket.on('message', function(data) {
+    var room = data.room;
+    var message = data.message;
     console.log('\[Room ' + room + '\] Client said: ', message);
-    // for a real app, would be room-only (not broadcast)
-    // socket.broadcast.emit('message', message);
     socket.to(room).emit('message', message)
   });
 

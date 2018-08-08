@@ -3,6 +3,7 @@
 var isChannelReady = false;
 var isInitiator = false;
 var isStarted = false;
+var gotLocalStream = false;
 var localStream;
 var pc;
 var remoteStream;
@@ -53,7 +54,7 @@ var sdpConstraints = {
 
 /////////////////////////////////////////////
 
-var room = 'shaqfoo';
+var room
 // Could prompt for room name:
 // room = prompt('Enter room name:');
 
@@ -69,8 +70,14 @@ var socket = io.connect();
 //   console.log('Attempted to create or  join room', room);
 // }
 
+var roomInput = document.getElementById('roomInput');
+var joinButton = document.getElementById("joinButton")
+var hangupButton = document.getElementById("hangupButton")
+
+getUserMedia()
+
 function createJoinRoom() {
-  var textInput = document.getElementById('roomInput').value;
+  var textInput = roomInput.value;
   
   if (textInput !== '' || textInput != null) {
     room = textInput;
@@ -81,8 +88,8 @@ function createJoinRoom() {
 
 socket.on('created', function(room) {
   console.log('Created room ' + room);
-  document.getElementById("submitButton").disabled = true
-  document.getElementById("hangupButton").disabled = false
+  joinButton.disabled = true
+  // hangupButton.disabled = false
   isInitiator = true;
 });
 
@@ -94,18 +101,22 @@ socket.on('full', function(room) {
 socket.on('join', function (room){
   console.log('Another peer made a request to join room ' + room);
   console.log('This peer is the initiator of room ' + room + '!');
-  document.getElementById("submitButton").disabled = true
-  document.getElementById("hangupButton").disabled = false
-  getUserMedia();
+  joinButton.disabled = true;
+  hangupButton.disabled = false;
   isChannelReady = true;
+  if (isInitiator) {
+    maybeStart();
+  }
 });
 
 socket.on('joined', function(room) {
   console.log('joined: ' + room);
-  document.getElementById("submitButton").disabled = true
-  document.getElementById("hangupButton").disabled = false
-  getUserMedia();
+  joinButton.disabled = true
+  hangupButton.disabled = false
   isChannelReady = true;
+  if (isInitiator) {
+    maybeStart();
+  }
 });
 
 socket.on('log', function(array) {
@@ -114,8 +125,8 @@ socket.on('log', function(array) {
 
 socket.on('destroyed', function(room) {
   console.log('Room ' + room + ' destroyed');
-  document.getElementById("submitButton").disabled = false
-  document.getElementById("hangupButton").disabled = true
+  joinButton.disabled = false;
+  hangupButton.disabled = true;
   isChannelReady = false;
   isInitiator = false;
 });
@@ -124,8 +135,15 @@ socket.on('destroyed', function(room) {
 
 function sendMessage(message) {
   console.log('Client sending message: ', message);
-  if (room !== '' || room != null) {
-    socket.emit('message', room, message);
+  if (room !== undefined || room != null) {
+    // socket.emit('message', room, message);
+    var data = {
+      'room': room,
+      'message': message
+    }
+    socket.emit('message', data);
+  } else {
+    alert('You have not joined a room');
   }
 }
 
@@ -135,12 +153,14 @@ socket.on('message', function(message) {
   if (message === 'got user media') {
     maybeStart();
   } else if (message.type === 'offer') {
+    console.log('I RECIEVED AN OFFER!!');
     if (!isInitiator && !isStarted) {
       maybeStart();
     }
     pc.setRemoteDescription(new RTCSessionDescription(message));
     doAnswer();
   } else if (message.type === 'answer' && isStarted) {
+    console.log('I RECIEVED AN ANSWER!!');
     pc.setRemoteDescription(new RTCSessionDescription(message));
   } else if (message.type === 'candidate' && isStarted) {
     var candidate = new RTCIceCandidate({
@@ -177,6 +197,8 @@ function getUserMedia() {
   .then(gotStream)
   .catch(function(e) {
     alert('getUserMedia() error: ' + e.name);
+    joinButton.disabled = true;
+    hangupButton.disabled = true;
   });
 }
 
@@ -184,10 +206,12 @@ function gotStream(stream) {
   console.log('Adding local stream.');
   localStream = stream;
   localAudio.srcObject = stream;
-  sendMessage('got user media');
-  if (isInitiator) {
-    maybeStart();
-  }
+  gotLocalStream = true
+  joinButton.disabled = false
+  // sendMessage('got user media');
+  // if (isInitiator) {
+  //   maybeStart();
+  // }
 }
 
 var constraints = {
@@ -211,7 +235,8 @@ function maybeStart() {
     pc.addStream(localStream);
     isStarted = true;
     console.log('isInitiator', isInitiator);
-    if (isInitiator) {
+    console.log('gotStream', gotLocalStream);
+    if (isInitiator && gotLocalStream) {
       doCall();
     }
   }
@@ -219,8 +244,8 @@ function maybeStart() {
 
 window.onbeforeunload = function() {
   console.log('window.onbeforeunload');
-  socket.emit('bye', room);
   sendMessage('bye');
+  socket.emit('bye', room);
 };
 
 /////////////////////////////////////////////////////////
@@ -230,6 +255,7 @@ function createPeerConnection() {
     pc = new RTCPeerConnection(null);
     pc.onicecandidate = handleIceCandidate;
     pc.onaddstream = handleRemoteStreamAdded;
+    console.log('adding handler to remote stream added, peer: ', pc);
     // pc.ontrack = handleRemoteStreamAdded
     pc.onremovestream = handleRemoteStreamRemoved;
     console.log('Created RTCPeerConnnection');
@@ -329,8 +355,9 @@ function handleRemoteStreamRemoved(event) {
 function hangup() {
   console.log('Hanging up.');
   stop();
-  socket.emit('bye', room);
+  isInitiator = false;
   sendMessage('bye');
+  socket.emit('bye', room);
 }
 
 function handleRemoteHangup() {
